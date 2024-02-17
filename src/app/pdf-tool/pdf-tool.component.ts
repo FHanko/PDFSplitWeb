@@ -12,17 +12,26 @@ import { PDFUtil } from './pdf-util';
   styleUrl: './pdf-tool.component.scss'
 })
 export class PdfToolComponent {
-  files: File[] = []
+  getPDFs() {
+    return PDFUtil.docs;
+  }
 
-  onFileSelect(event: Event) {
+  getError() {
+    return PDFUtil.error;
+  }
+
+  async onFileSelect(event: Event) {
     const target = event.target as HTMLInputElement;
     const fileList = target.files;
     if (fileList == null) return;
 
     for (let i = 0; i < fileList.length; i++) {
       let file = fileList.item(i);
-      if (file == null) continue; 
-      this.files.push(file)
+      if (file == null) continue;
+      let buffer = await file.arrayBuffer()
+      let doc = await PDFDocument.load(buffer)
+      doc.setTitle(file.name)
+      PDFUtil.docs.push(doc)
     }
   }
 
@@ -30,17 +39,12 @@ export class PdfToolComponent {
   parseErr: SyntaxErr[] = []
 
   async generate() {
-    PDFUtil.docs = []
-    for (const file of this.files) {
-      let buffer = await file.arrayBuffer()
-      PDFUtil.docs.push(await PDFDocument.load(buffer))
-    }
-
+    PDFUtil.error = "";
     let x = new Parser(this.expression)
     let result = x.parse()
     this.parseErr = result.errs
 
-    const bytes = await result.ast?.doc.save()
+    const bytes = await (await result.ast?.doc)?.save()
     if (bytes == null) return;
     this.downloadBlob(new Blob([new Uint8Array(bytes)]))
   }

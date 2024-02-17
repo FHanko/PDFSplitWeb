@@ -5,26 +5,57 @@
 * import { PDFDocument } from 'pdf-lib';
 * ---
 * start       := expr=expression $
-*                .doc = PDFDocument { return expr.doc; }
-* expression  := group=fileGroup ':' pageGroup ',' expr=expression 
-*                .doc = PDFDocument { return PDFUtil.concat(group.doc, expr.doc); }
-*              | group=fileGroup ':' pageGroup 
-*                .doc = PDFDocument { return group.doc; }
+*                .doc = Promise<PDFDocument>  { 
+*                                               return expr.doc; 
+*                                             }
+* expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression 
+*                .doc = Promise<PDFDocument>  { 
+*                                               return PDFUtil.concat(PDFUtil.pickPages(fgroup.doc, pgroup.pages), expr.doc); 
+*                                             }
+*              | fgroup=fileGroup ':' pgroup=pageGroup 
+*                .doc = Promise<PDFDocument>  { 
+*                                               return PDFUtil.pickPages(fgroup.doc, pgroup.pages); 
+*                                             }
 *              | group=fileGroup ',' expr=expression 
-*                .doc = PDFDocument { return PDFUtil.concat(group.doc, expr.doc); }
+*                .doc = Promise<PDFDocument>  { 
+*                                               return PDFUtil.concat(group.doc, expr.doc); 
+*                                             }
 *              | group=fileGroup
-*                .doc = PDFDocument { return group.doc; }
-* pageGroup   := '\(' pageList '\)'
-* pageList    := page ',' pageList | page
-* page        := num
+*                .doc = Promise<PDFDocument>  { 
+*                                               return group.doc; 
+*                                             }
+* pageGroup   := '\(' list=pageList '\)'
+*                .pages = number[]  { 
+*                                     return list.pages; 
+*                                   }
+* pageList    := p=page ',' list=pageList 
+*                .pages = number[]  { 
+*                                     return [p.page].concat(list.pages); 
+*                                   }
+*              | p=page
+*                .pages = number[]  { 
+*                                     return [p.page]; 
+*                                   }
+* page        := id=num
+*                .page = number     { 
+*                                     return id.value; 
+*                                   }
 * fileGroup   := '\(' list=fileList '\)'
-*                .doc = PDFDocument { return list.doc; }
+*                .doc = Promise<PDFDocument>  { 
+*                                               return list.doc; 
+*                                             }
 * fileList    := left=file ',' right=fileList 
-*                .doc = PDFDocument { return PDFUtil.concat(left.doc, right.doc); }
+*                .doc = Promise<PDFDocument>  { 
+*                                               return PDFUtil.concat(left.doc, right.doc); 
+*                                             }
 *              | left=file
-*                .doc = PDFDocument { return left.doc; } 
+*                .doc = Promise<PDFDocument>  { 
+*                                               return left.doc; 
+*                                             } 
 * file        := id=num                             
-*                .doc = PDFDocument { return PDFUtil.identity(id.value); }
+*                .doc = Promise<PDFDocument>  { 
+*                                               return PDFUtil.identity(id.value); 
+*                                             }
 * num         := val='[0-9]+'
 *                .value = number { return parseInt(val); }
 */
@@ -57,10 +88,10 @@ export enum ASTKinds {
 export class start {
     public kind: ASTKinds.start = ASTKinds.start;
     public expr: expression;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(expr: expression){
         this.expr = expr;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return expr.doc;
         })();
     }
@@ -68,25 +99,29 @@ export class start {
 export type expression = expression_1 | expression_2 | expression_3 | expression_4;
 export class expression_1 {
     public kind: ASTKinds.expression_1 = ASTKinds.expression_1;
-    public group: fileGroup;
+    public fgroup: fileGroup;
+    public pgroup: pageGroup;
     public expr: expression;
-    public doc: PDFDocument;
-    constructor(group: fileGroup, expr: expression){
-        this.group = group;
+    public doc: Promise<PDFDocument>;
+    constructor(fgroup: fileGroup, pgroup: pageGroup, expr: expression){
+        this.fgroup = fgroup;
+        this.pgroup = pgroup;
         this.expr = expr;
-        this.doc = ((): PDFDocument => {
-        return PDFUtil.concat(group.doc, expr.doc);
+        this.doc = ((): Promise<PDFDocument> => {
+        return PDFUtil.concat(PDFUtil.pickPages(fgroup.doc, pgroup.pages), expr.doc);
         })();
     }
 }
 export class expression_2 {
     public kind: ASTKinds.expression_2 = ASTKinds.expression_2;
-    public group: fileGroup;
-    public doc: PDFDocument;
-    constructor(group: fileGroup){
-        this.group = group;
-        this.doc = ((): PDFDocument => {
-        return group.doc;
+    public fgroup: fileGroup;
+    public pgroup: pageGroup;
+    public doc: Promise<PDFDocument>;
+    constructor(fgroup: fileGroup, pgroup: pageGroup){
+        this.fgroup = fgroup;
+        this.pgroup = pgroup;
+        this.doc = ((): Promise<PDFDocument> => {
+        return PDFUtil.pickPages(fgroup.doc, pgroup.pages);
         })();
     }
 }
@@ -94,11 +129,11 @@ export class expression_3 {
     public kind: ASTKinds.expression_3 = ASTKinds.expression_3;
     public group: fileGroup;
     public expr: expression;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(group: fileGroup, expr: expression){
         this.group = group;
         this.expr = expr;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return PDFUtil.concat(group.doc, expr.doc);
         })();
     }
@@ -106,30 +141,68 @@ export class expression_3 {
 export class expression_4 {
     public kind: ASTKinds.expression_4 = ASTKinds.expression_4;
     public group: fileGroup;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(group: fileGroup){
         this.group = group;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return group.doc;
         })();
     }
 }
-export interface pageGroup {
-    kind: ASTKinds.pageGroup;
+export class pageGroup {
+    public kind: ASTKinds.pageGroup = ASTKinds.pageGroup;
+    public list: pageList;
+    public pages: number[];
+    constructor(list: pageList){
+        this.list = list;
+        this.pages = ((): number[] => {
+        return list.pages;
+        })();
+    }
 }
 export type pageList = pageList_1 | pageList_2;
-export interface pageList_1 {
-    kind: ASTKinds.pageList_1;
+export class pageList_1 {
+    public kind: ASTKinds.pageList_1 = ASTKinds.pageList_1;
+    public p: page;
+    public list: pageList;
+    public pages: number[];
+    constructor(p: page, list: pageList){
+        this.p = p;
+        this.list = list;
+        this.pages = ((): number[] => {
+        return [p.page].concat(list.pages);
+        })();
+    }
 }
-export type pageList_2 = page;
-export type page = num;
+export class pageList_2 {
+    public kind: ASTKinds.pageList_2 = ASTKinds.pageList_2;
+    public p: page;
+    public pages: number[];
+    constructor(p: page){
+        this.p = p;
+        this.pages = ((): number[] => {
+        return [p.page];
+        })();
+    }
+}
+export class page {
+    public kind: ASTKinds.page = ASTKinds.page;
+    public id: num;
+    public page: number;
+    constructor(id: num){
+        this.id = id;
+        this.page = ((): number => {
+        return id.value;
+        })();
+    }
+}
 export class fileGroup {
     public kind: ASTKinds.fileGroup = ASTKinds.fileGroup;
     public list: fileList;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(list: fileList){
         this.list = list;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return list.doc;
         })();
     }
@@ -139,11 +212,11 @@ export class fileList_1 {
     public kind: ASTKinds.fileList_1 = ASTKinds.fileList_1;
     public left: file;
     public right: fileList;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(left: file, right: fileList){
         this.left = left;
         this.right = right;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return PDFUtil.concat(left.doc, right.doc);
         })();
     }
@@ -151,10 +224,10 @@ export class fileList_1 {
 export class fileList_2 {
     public kind: ASTKinds.fileList_2 = ASTKinds.fileList_2;
     public left: file;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(left: file){
         this.left = left;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return left.doc;
         })();
     }
@@ -162,10 +235,10 @@ export class fileList_2 {
 export class file {
     public kind: ASTKinds.file = ASTKinds.file;
     public id: num;
-    public doc: PDFDocument;
+    public doc: Promise<PDFDocument>;
     constructor(id: num){
         this.id = id;
-        this.doc = ((): PDFDocument => {
+        this.doc = ((): Promise<PDFDocument> => {
         return PDFUtil.identity(id.value);
         })();
     }
@@ -223,17 +296,18 @@ export class Parser {
     public matchexpression_1($$dpth: number, $$cr?: ErrorTracker): Nullable<expression_1> {
         return this.run<expression_1>($$dpth,
             () => {
-                let $scope$group: Nullable<fileGroup>;
+                let $scope$fgroup: Nullable<fileGroup>;
+                let $scope$pgroup: Nullable<pageGroup>;
                 let $scope$expr: Nullable<expression>;
                 let $$res: Nullable<expression_1> = null;
                 if (true
-                    && ($scope$group = this.matchfileGroup($$dpth + 1, $$cr)) !== null
+                    && ($scope$fgroup = this.matchfileGroup($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?::)`, "", $$dpth + 1, $$cr) !== null
-                    && this.matchpageGroup($$dpth + 1, $$cr) !== null
+                    && ($scope$pgroup = this.matchpageGroup($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:,)`, "", $$dpth + 1, $$cr) !== null
                     && ($scope$expr = this.matchexpression($$dpth + 1, $$cr)) !== null
                 ) {
-                    $$res = new expression_1($scope$group, $scope$expr);
+                    $$res = new expression_1($scope$fgroup, $scope$pgroup, $scope$expr);
                 }
                 return $$res;
             });
@@ -241,14 +315,15 @@ export class Parser {
     public matchexpression_2($$dpth: number, $$cr?: ErrorTracker): Nullable<expression_2> {
         return this.run<expression_2>($$dpth,
             () => {
-                let $scope$group: Nullable<fileGroup>;
+                let $scope$fgroup: Nullable<fileGroup>;
+                let $scope$pgroup: Nullable<pageGroup>;
                 let $$res: Nullable<expression_2> = null;
                 if (true
-                    && ($scope$group = this.matchfileGroup($$dpth + 1, $$cr)) !== null
+                    && ($scope$fgroup = this.matchfileGroup($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?::)`, "", $$dpth + 1, $$cr) !== null
-                    && this.matchpageGroup($$dpth + 1, $$cr) !== null
+                    && ($scope$pgroup = this.matchpageGroup($$dpth + 1, $$cr)) !== null
                 ) {
-                    $$res = new expression_2($scope$group);
+                    $$res = new expression_2($scope$fgroup, $scope$pgroup);
                 }
                 return $$res;
             });
@@ -285,13 +360,14 @@ export class Parser {
     public matchpageGroup($$dpth: number, $$cr?: ErrorTracker): Nullable<pageGroup> {
         return this.run<pageGroup>($$dpth,
             () => {
+                let $scope$list: Nullable<pageList>;
                 let $$res: Nullable<pageGroup> = null;
                 if (true
                     && this.regexAccept(String.raw`(?:\()`, "", $$dpth + 1, $$cr) !== null
-                    && this.matchpageList($$dpth + 1, $$cr) !== null
+                    && ($scope$list = this.matchpageList($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:\))`, "", $$dpth + 1, $$cr) !== null
                 ) {
-                    $$res = {kind: ASTKinds.pageGroup, };
+                    $$res = new pageGroup($scope$list);
                 }
                 return $$res;
             });
@@ -305,22 +381,44 @@ export class Parser {
     public matchpageList_1($$dpth: number, $$cr?: ErrorTracker): Nullable<pageList_1> {
         return this.run<pageList_1>($$dpth,
             () => {
+                let $scope$p: Nullable<page>;
+                let $scope$list: Nullable<pageList>;
                 let $$res: Nullable<pageList_1> = null;
                 if (true
-                    && this.matchpage($$dpth + 1, $$cr) !== null
+                    && ($scope$p = this.matchpage($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:,)`, "", $$dpth + 1, $$cr) !== null
-                    && this.matchpageList($$dpth + 1, $$cr) !== null
+                    && ($scope$list = this.matchpageList($$dpth + 1, $$cr)) !== null
                 ) {
-                    $$res = {kind: ASTKinds.pageList_1, };
+                    $$res = new pageList_1($scope$p, $scope$list);
                 }
                 return $$res;
             });
     }
     public matchpageList_2($$dpth: number, $$cr?: ErrorTracker): Nullable<pageList_2> {
-        return this.matchpage($$dpth + 1, $$cr);
+        return this.run<pageList_2>($$dpth,
+            () => {
+                let $scope$p: Nullable<page>;
+                let $$res: Nullable<pageList_2> = null;
+                if (true
+                    && ($scope$p = this.matchpage($$dpth + 1, $$cr)) !== null
+                ) {
+                    $$res = new pageList_2($scope$p);
+                }
+                return $$res;
+            });
     }
     public matchpage($$dpth: number, $$cr?: ErrorTracker): Nullable<page> {
-        return this.matchnum($$dpth + 1, $$cr);
+        return this.run<page>($$dpth,
+            () => {
+                let $scope$id: Nullable<num>;
+                let $$res: Nullable<page> = null;
+                if (true
+                    && ($scope$id = this.matchnum($$dpth + 1, $$cr)) !== null
+                ) {
+                    $$res = new page($scope$id);
+                }
+                return $$res;
+            });
     }
     public matchfileGroup($$dpth: number, $$cr?: ErrorTracker): Nullable<fileGroup> {
         return this.run<fileGroup>($$dpth,
