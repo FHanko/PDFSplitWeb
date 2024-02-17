@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PDFDocument } from 'pdf-lib';
 import { Parser, ParseResult, SyntaxErr } from './pdf-tool-parser';
-import { isDefined } from '@ng-bootstrap/ng-bootstrap/util/util';
+import { PDFUtil } from './pdf-util';
 
 @Component({
   selector: 'pdf-tool',
@@ -29,34 +29,19 @@ export class PdfToolComponent {
   expression: string = ""
   parseErr: SyntaxErr[] = []
 
-  static docs: PDFDocument[] = []
-
-  static concat(left: PDFDocument, right: PDFDocument): PDFDocument {
-    left.copyPages(right, right.getPageIndices()).then(pages => {
-      for (let page of pages) {
-        left.addPage(page)
-      }
-    }).catch(e => { throw new Error("Error on concat " + e) })
-    return left;
-  }
-
-  static identity(id: number): PDFDocument {
-    return PdfToolComponent.docs[id]
-  }
-
   async generate() {
-    PdfToolComponent.docs = []
+    PDFUtil.docs = []
     for (const file of this.files) {
       let buffer = await file.arrayBuffer()
-      PdfToolComponent.docs.push(await PDFDocument.load(buffer))
+      PDFUtil.docs.push(await PDFDocument.load(buffer))
     }
 
     let x = new Parser(this.expression)
     let result = x.parse()
     this.parseErr = result.errs
 
-    if (!isDefined(result.ast) || result.ast == null) return;
-    const bytes = await result.ast.doc.save()
+    const bytes = await result.ast?.doc.save()
+    if (bytes == null) return;
     this.downloadBlob(new Blob([new Uint8Array(bytes)]))
   }
 
