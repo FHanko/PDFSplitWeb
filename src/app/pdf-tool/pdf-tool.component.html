@@ -1,0 +1,7 @@
+@for (file of files; track $index) {
+    <p><strong>{{$index}}: </strong><i>{{file.name}}</i></p>
+}
+
+<input type="file" class="form-control" style="max-width: 500px;" (change)="onFileSelect($event)" multiple>
+<input type="text" class="form-control mt-3" placeholder="Expression" [(ngModel)]="expression">
+<button type="button" class="btn btn-primary mt-3" (click)="generate()">Generate</button>
