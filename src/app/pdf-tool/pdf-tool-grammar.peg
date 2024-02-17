@@ -10,54 +10,63 @@ start       := expr=expression $
 
 expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression 
                .doc = Promise<PDFDocument>  { 
-                                              return PDFUtil.concat(PDFUtil.pickPages(fgroup.doc, pgroup.pages), expr.doc); 
+                                              return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages), expr.doc); 
                                             }
              | fgroup=fileGroup ':' pgroup=pageGroup 
                .doc = Promise<PDFDocument>  { 
-                                              return PDFUtil.pickPages(fgroup.doc, pgroup.pages); 
+                                              return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages);
                                             }
              | group=fileGroup ',' expr=expression 
                .doc = Promise<PDFDocument>  { 
-                                              return PDFUtil.concat(group.doc, expr.doc); 
+                                              return PDFUtil.concat(PDFUtil.collapse(group.docs), expr.doc);
                                             }
              | group=fileGroup
                .doc = Promise<PDFDocument>  { 
-                                              return group.doc; 
+                                              return PDFUtil.collapse(group.docs);
                                             }
 
 pageGroup   := '\(' list=pageList '\)'
-               .pages = number[]  { 
-                                    return list.pages; 
-                                  }
+               .pages = number[]            { 
+                                              return list.pages; 
+                                            }
 pageList    := p=page ',' list=pageList 
-               .pages = number[]  { 
-                                    return [p.page].concat(list.pages); 
-                                  }
+               .pages = number[]            { 
+                                              return [p.page].concat(list.pages); 
+                                            }
+             | left=page '~' right=page
+               .pages = number[]            {
+                                              return PDFUtil.range(left.page, right.page);
+                                            }
              | p=page
-               .pages = number[]  { 
-                                    return [p.page]; 
-                                  }
+               .pages = number[]            { 
+                                              return [p.page]; 
+                                            }
 page        := id=num
-               .page = number     { 
-                                    return id.value; 
-                                  }
+               .page = number               { 
+                                              return id.value; 
+                                            }
 
 fileGroup   := '\(' list=fileList '\)'
-               .doc = Promise<PDFDocument>  { 
-                                              return list.doc; 
-                                            }
+               .docs = Promise<PDFDocument>[] { 
+                                                return list.docs; 
+                                              }
 fileList    := left=file ',' right=fileList 
-               .doc = Promise<PDFDocument>  { 
-                                              return PDFUtil.concat(left.doc, right.doc); 
-                                            }
-             | left=file
-               .doc = Promise<PDFDocument>  { 
-                                              return left.doc; 
-                                            } 
+               .docs = Promise<PDFDocument>[] { 
+                                                return [left.doc].concat(right.docs); 
+                                              }
+             | f=file
+               .docs = Promise<PDFDocument>[] { 
+                                                return [f.doc]; 
+                                              } 
 file        := id=num                             
                .doc = Promise<PDFDocument>  { 
                                               return PDFUtil.identity(id.value); 
                                             }
 
 num         := val='[0-9]+'
-               .value = number { return parseInt(val); }
+               .value = number              { 
+                                              return parseInt(val); 
+                                            }
+
+// This rule matches any whitespace
+_    := '\s*'
