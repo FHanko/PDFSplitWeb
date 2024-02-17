@@ -37,6 +37,12 @@
           }
         }
       }
+    },
+    {
+      "label": "Create parser",
+      "type": "shell",
+      "group": "build",
+      "command": "tspeg ./src/app/pdf-tool/pdf-tool-grammar.peg ./src/app/pdf-tool/pdf-tool-parser.ts"
     }
   ]
 }
