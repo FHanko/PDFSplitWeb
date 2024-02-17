@@ -1,5 +1,8 @@
 @for (pdf of getPDFs(); track $index) {
-    <p><strong>{{$index+1}}: </strong><i>{{pdf.getTitle()}} ({{pdf.getPageCount()}} pages)</i></p>
+    <p>
+        <strong>{{$index+1}}: </strong><i>{{pdf.getTitle()}} ({{pdf.getPageCount()}} pages)</i>
+        <button type="button" class="btn btn-outline-danger pt-1 pb-1 pe-2 ps-2 ms-2" style="font-size: 10px;" (click)="removePDF(pdf)">X</button>
+    </p>
 }
 
 <input type="file" class="form-control" style="max-width: 500px;" (change)="onFileSelect($event)" multiple>

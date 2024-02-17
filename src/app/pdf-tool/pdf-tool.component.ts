@@ -16,6 +16,10 @@ export class PdfToolComponent {
     return PDFUtil.docs;
   }
 
+  removePDF(pdf: PDFDocument) {
+    PDFUtil.docs = PDFUtil.docs.filter(p => p != pdf);
+  }
+
   getError() {
     return PDFUtil.error;
   }
