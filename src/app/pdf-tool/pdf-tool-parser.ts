@@ -8,7 +8,7 @@
 *                .doc = Promise<PDFDocument>  { 
 *                                               return expr.doc; 
 *                                             }
-* expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression 
+* expression  := fgroup=fileGroup ':' pgroup=pageGroup w+ expr=expression 
 *                .doc = Promise<PDFDocument>  { 
 *                                               return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse), expr.doc); 
 *                                             }
@@ -16,7 +16,7 @@
 *                .doc = Promise<PDFDocument>  { 
 *                                               return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse);
 *                                             }
-*              | group=fileGroup ',' expr=expression 
+*              | group=fileGroup w+ expr=expression 
 *                .doc = Promise<PDFDocument>  { 
 *                                               return PDFUtil.concat(PDFUtil.collapse(group.docs), expr.doc);
 *                                             }
@@ -30,9 +30,9 @@
 *              | '-\(' list=pageList '\)'
 *                .pages = number[]            { return list.pages; }
 *                .reverse = boolean           { return true; }
-* pageList    := p=page ',' list=pageList 
+* pageList    := left=pageList ',' w* right=pageList 
 *                .pages = number[]            { 
-*                                               return [p.page].concat(list.pages); 
+*                                               return left.pages.concat(right.pages); 
 *                                             }
 *              | from=page '~' to=page
 *                .pages = number[]            {
@@ -50,7 +50,7 @@
 *                .docs = Promise<PDFDocument>[] { 
 *                                                 return list.docs; 
 *                                               }
-* fileList    := left=file ',' right=fileList 
+* fileList    := left=file ',' w* right=fileList 
 *                .docs = Promise<PDFDocument>[] { 
 *                                                 return [left.doc].concat(right.docs); 
 *                                               }
@@ -71,7 +71,7 @@
 *                                               return parseInt(val); 
 *                                             }
 * // This rule matches any whitespace
-* _    := '\s*'
+* w    := '\s*'
 */
 
 import { PDFUtil } from './pdf-util';
@@ -100,7 +100,7 @@ export enum ASTKinds {
     fileList_3 = "fileList_3",
     file = "file",
     num = "num",
-    _ = "_",
+    w = "w",
     $EOF = "$EOF",
 }
 export class start {
@@ -201,14 +201,14 @@ export class pageGroup_2 {
 export type pageList = pageList_1 | pageList_2 | pageList_3;
 export class pageList_1 {
     public kind: ASTKinds.pageList_1 = ASTKinds.pageList_1;
-    public p: page;
-    public list: pageList;
+    public left: pageList;
+    public right: pageList;
     public pages: number[];
-    constructor(p: page, list: pageList){
-        this.p = p;
-        this.list = list;
+    constructor(left: pageList, right: pageList){
+        this.left = left;
+        this.right = right;
         this.pages = ((): number[] => {
-        return [p.page].concat(list.pages);
+        return left.pages.concat(right.pages);
         })();
     }
 }
@@ -318,7 +318,7 @@ export class num {
         })();
     }
 }
-export type _ = string;
+export type w = string;
 export class Parser {
     private readonly input: string;
     private pos: PosInfo;
@@ -335,7 +335,9 @@ export class Parser {
         return this.pos.overallPos === this.input.length;
     }
     public clearMemos(): void {
+        this.$scope$pageList$memo.clear();
     }
+    protected $scope$pageList$memo: Map<number, [Nullable<pageList>, PosInfo]> = new Map();
     public matchstart($$dpth: number, $$cr?: ErrorTracker): Nullable<start> {
         return this.run<start>($$dpth,
             () => {
@@ -369,7 +371,7 @@ export class Parser {
                     && ($scope$fgroup = this.matchfileGroup($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?::)`, "", $$dpth + 1, $$cr) !== null
                     && ($scope$pgroup = this.matchpageGroup($$dpth + 1, $$cr)) !== null
-                    && this.regexAccept(String.raw`(?:,)`, "", $$dpth + 1, $$cr) !== null
+                    && this.loopPlus<w>(() => this.matchw($$dpth + 1, $$cr)) !== null
                     && ($scope$expr = this.matchexpression($$dpth + 1, $$cr)) !== null
                 ) {
                     $$res = new expression_1($scope$fgroup, $scope$pgroup, $scope$expr);
@@ -401,7 +403,7 @@ export class Parser {
                 let $$res: Nullable<expression_3> = null;
                 if (true
                     && ($scope$group = this.matchfileGroup($$dpth + 1, $$cr)) !== null
-                    && this.regexAccept(String.raw`(?:,)`, "", $$dpth + 1, $$cr) !== null
+                    && this.loopPlus<w>(() => this.matchw($$dpth + 1, $$cr)) !== null
                     && ($scope$expr = this.matchexpression($$dpth + 1, $$cr)) !== null
                 ) {
                     $$res = new expression_3($scope$group, $scope$expr);
@@ -459,24 +461,51 @@ export class Parser {
             });
     }
     public matchpageList($$dpth: number, $$cr?: ErrorTracker): Nullable<pageList> {
-        return this.choice<pageList>([
-            () => this.matchpageList_1($$dpth + 1, $$cr),
-            () => this.matchpageList_2($$dpth + 1, $$cr),
-            () => this.matchpageList_3($$dpth + 1, $$cr),
-        ]);
+        const fn = () => {
+            return this.choice<pageList>([
+                () => this.matchpageList_1($$dpth + 1, $$cr),
+                () => this.matchpageList_2($$dpth + 1, $$cr),
+                () => this.matchpageList_3($$dpth + 1, $$cr),
+            ]);
+        };
+        const $scope$pos = this.mark();
+        const memo = this.$scope$pageList$memo.get($scope$pos.overallPos);
+        if(memo !== undefined) {
+            this.reset(memo[1]);
+            return memo[0];
+        }
+        const $scope$oldMemoSafe = this.memoSafe;
+        this.memoSafe = false;
+        this.$scope$pageList$memo.set($scope$pos.overallPos, [null, $scope$pos]);
+        let lastRes: Nullable<pageList> = null;
+        let lastPos: PosInfo = $scope$pos;
+        for(;;) {
+            this.reset($scope$pos);
+            const res = fn();
+            const end = this.mark();
+            if(end.overallPos <= lastPos.overallPos)
+                break;
+            lastRes = res;
+            lastPos = end;
+            this.$scope$pageList$memo.set($scope$pos.overallPos, [lastRes, lastPos]);
+        }
+        this.reset(lastPos);
+        this.memoSafe = $scope$oldMemoSafe;
+        return lastRes;
     }
     public matchpageList_1($$dpth: number, $$cr?: ErrorTracker): Nullable<pageList_1> {
         return this.run<pageList_1>($$dpth,
             () => {
-                let $scope$p: Nullable<page>;
-                let $scope$list: Nullable<pageList>;
+                let $scope$left: Nullable<pageList>;
+                let $scope$right: Nullable<pageList>;
                 let $$res: Nullable<pageList_1> = null;
                 if (true
-                    && ($scope$p = this.matchpage($$dpth + 1, $$cr)) !== null
+                    && ($scope$left = this.matchpageList($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:,)`, "", $$dpth + 1, $$cr) !== null
-                    && ($scope$list = this.matchpageList($$dpth + 1, $$cr)) !== null
+                    && this.loop<w>(() => this.matchw($$dpth + 1, $$cr), 0, -1) !== null
+                    && ($scope$right = this.matchpageList($$dpth + 1, $$cr)) !== null
                 ) {
-                    $$res = new pageList_1($scope$p, $scope$list);
+                    $$res = new pageList_1($scope$left, $scope$right);
                 }
                 return $$res;
             });
@@ -554,6 +583,7 @@ export class Parser {
                 if (true
                     && ($scope$left = this.matchfile($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:,)`, "", $$dpth + 1, $$cr) !== null
+                    && this.loop<w>(() => this.matchw($$dpth + 1, $$cr), 0, -1) !== null
                     && ($scope$right = this.matchfileList($$dpth + 1, $$cr)) !== null
                 ) {
                     $$res = new fileList_1($scope$left, $scope$right);
@@ -616,7 +646,7 @@ export class Parser {
                 return $$res;
             });
     }
-    public match_($$dpth: number, $$cr?: ErrorTracker): Nullable<_> {
+    public matchw($$dpth: number, $$cr?: ErrorTracker): Nullable<w> {
         return this.regexAccept(String.raw`(?:\s*)`, "", $$dpth + 1, $$cr);
     }
     public test(): boolean {

@@ -8,7 +8,7 @@ start       := expr=expression $
                                               return expr.doc; 
                                             }
 
-expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression 
+expression  := fgroup=fileGroup ':' pgroup=pageGroup w+ expr=expression 
                .doc = Promise<PDFDocument>  { 
                                               return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse), expr.doc); 
                                             }
@@ -16,7 +16,7 @@ expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression
                .doc = Promise<PDFDocument>  { 
                                               return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse);
                                             }
-             | group=fileGroup ',' expr=expression 
+             | group=fileGroup w+ expr=expression 
                .doc = Promise<PDFDocument>  { 
                                               return PDFUtil.concat(PDFUtil.collapse(group.docs), expr.doc);
                                             }
@@ -32,9 +32,9 @@ pageGroup   := '\(' list=pageList '\)'
                .pages = number[]            { return list.pages; }
                .reverse = boolean           { return true; }
 
-pageList    := p=page ',' list=pageList 
+pageList    := left=pageList ',' w* right=pageList 
                .pages = number[]            { 
-                                              return [p.page].concat(list.pages); 
+                                              return left.pages.concat(right.pages); 
                                             }
              | from=page '~' to=page
                .pages = number[]            {
@@ -53,7 +53,7 @@ fileGroup   := '\(' list=fileList '\)'
                .docs = Promise<PDFDocument>[] { 
                                                 return list.docs; 
                                               }
-fileList    := left=file ',' right=fileList 
+fileList    := left=file ',' w* right=fileList 
                .docs = Promise<PDFDocument>[] { 
                                                 return [left.doc].concat(right.docs); 
                                               }
@@ -76,4 +76,4 @@ num         := val='[0-9]+'
                                             }
 
 // This rule matches any whitespace
-_    := '\s*'
+w    := '\s*'
