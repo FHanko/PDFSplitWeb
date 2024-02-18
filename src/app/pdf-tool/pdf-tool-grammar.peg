@@ -10,11 +10,11 @@ start       := expr=expression $
 
 expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression 
                .doc = Promise<PDFDocument>  { 
-                                              return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages), expr.doc); 
+                                              return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse), expr.doc); 
                                             }
              | fgroup=fileGroup ':' pgroup=pageGroup 
                .doc = Promise<PDFDocument>  { 
-                                              return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages);
+                                              return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse);
                                             }
              | group=fileGroup ',' expr=expression 
                .doc = Promise<PDFDocument>  { 
@@ -26,16 +26,19 @@ expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression
                                             }
 
 pageGroup   := '\(' list=pageList '\)'
-               .pages = number[]            { 
-                                              return list.pages; 
-                                            }
+               .pages = number[]            { return list.pages; }
+               .reverse = boolean           { return false; }
+             | '-\(' list=pageList '\)'
+               .pages = number[]            { return list.pages; }
+               .reverse = boolean           { return true; }
+
 pageList    := p=page ',' list=pageList 
                .pages = number[]            { 
                                               return [p.page].concat(list.pages); 
                                             }
-             | left=page '~' right=page
+             | from=page '~' to=page
                .pages = number[]            {
-                                              return PDFUtil.range(left.page, right.page);
+                                              return PDFUtil.range(from.page, to.page);
                                             }
              | p=page
                .pages = number[]            { 
@@ -53,6 +56,10 @@ fileGroup   := '\(' list=fileList '\)'
 fileList    := left=file ',' right=fileList 
                .docs = Promise<PDFDocument>[] { 
                                                 return [left.doc].concat(right.docs); 
+                                              }
+             | from=num '~' to=num          
+               .docs = Promise<PDFDocument>[] {
+                                                return PDFUtil.range(from.value, to.value).map(i => PDFUtil.identity(i));
                                               }
              | f=file
                .docs = Promise<PDFDocument>[] { 

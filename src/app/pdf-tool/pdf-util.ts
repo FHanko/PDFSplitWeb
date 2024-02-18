@@ -3,17 +3,19 @@ import { PDFDocument } from 'pdf-lib';
 export class PDFUtil {
   static docs: PDFDocument[] = []
   static error: string = ""
-  
-  static async pickPagesCollapse(docs: Promise<PDFDocument>[], indices: number[]): Promise<PDFDocument> {
+
+  static async pickPagesCollapse(docs: Promise<PDFDocument>[], indices: number[], reverseIndiced: boolean = false): Promise<PDFDocument> {
     let collapsable: Promise<PDFDocument>[] = []
     for (let doc of docs) {
-      collapsable.push(this.pickPages(doc, indices))
+      collapsable.push(this.pickPages(doc, indices, reverseIndiced))
     }
     return this.collapse(collapsable);
   }
 
-  static async pickPages(doc: Promise<PDFDocument>, indices: number[]): Promise<PDFDocument> {
+  static async pickPages(doc: Promise<PDFDocument>, indices: number[], reverseIndiced: boolean = false): Promise<PDFDocument> {
     let pdf = await doc
+    if (reverseIndiced) indices = pdf.getPageIndices().map(i => i + 1).filter(i => !indices.includes(i))
+
     let pages = await pdf.copyPages(pdf, indices.map(i => i - 1))
     let count = pdf.getPageCount();
     for (let i=0; i < count; i++) {

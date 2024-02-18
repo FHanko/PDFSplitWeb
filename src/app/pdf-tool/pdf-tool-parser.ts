@@ -10,11 +10,11 @@
 *                                             }
 * expression  := fgroup=fileGroup ':' pgroup=pageGroup ',' expr=expression 
 *                .doc = Promise<PDFDocument>  { 
-*                                               return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages), expr.doc); 
+*                                               return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse), expr.doc); 
 *                                             }
 *              | fgroup=fileGroup ':' pgroup=pageGroup 
 *                .doc = Promise<PDFDocument>  { 
-*                                               return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages);
+*                                               return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse);
 *                                             }
 *              | group=fileGroup ',' expr=expression 
 *                .doc = Promise<PDFDocument>  { 
@@ -25,16 +25,18 @@
 *                                               return PDFUtil.collapse(group.docs);
 *                                             }
 * pageGroup   := '\(' list=pageList '\)'
-*                .pages = number[]            { 
-*                                               return list.pages; 
-*                                             }
+*                .pages = number[]            { return list.pages; }
+*                .reverse = boolean           { return false; }
+*              | '-\(' list=pageList '\)'
+*                .pages = number[]            { return list.pages; }
+*                .reverse = boolean           { return true; }
 * pageList    := p=page ',' list=pageList 
 *                .pages = number[]            { 
 *                                               return [p.page].concat(list.pages); 
 *                                             }
-*              | left=page '~' right=page
+*              | from=page '~' to=page
 *                .pages = number[]            {
-*                                               return PDFUtil.range(left.page, right.page);
+*                                               return PDFUtil.range(from.page, to.page);
 *                                             }
 *              | p=page
 *                .pages = number[]            { 
@@ -51,6 +53,10 @@
 * fileList    := left=file ',' right=fileList 
 *                .docs = Promise<PDFDocument>[] { 
 *                                                 return [left.doc].concat(right.docs); 
+*                                               }
+*              | from=num '~' to=num          
+*                .docs = Promise<PDFDocument>[] {
+*                                                 return PDFUtil.range(from.value, to.value).map(i => PDFUtil.identity(i));
 *                                               }
 *              | f=file
 *                .docs = Promise<PDFDocument>[] { 
@@ -82,7 +88,8 @@ export enum ASTKinds {
     expression_2 = "expression_2",
     expression_3 = "expression_3",
     expression_4 = "expression_4",
-    pageGroup = "pageGroup",
+    pageGroup_1 = "pageGroup_1",
+    pageGroup_2 = "pageGroup_2",
     pageList_1 = "pageList_1",
     pageList_2 = "pageList_2",
     pageList_3 = "pageList_3",
@@ -90,6 +97,7 @@ export enum ASTKinds {
     fileGroup = "fileGroup",
     fileList_1 = "fileList_1",
     fileList_2 = "fileList_2",
+    fileList_3 = "fileList_3",
     file = "file",
     num = "num",
     _ = "_",
@@ -118,7 +126,7 @@ export class expression_1 {
         this.pgroup = pgroup;
         this.expr = expr;
         this.doc = ((): Promise<PDFDocument> => {
-        return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages), expr.doc);
+        return PDFUtil.concat(PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse), expr.doc);
         })();
     }
 }
@@ -131,7 +139,7 @@ export class expression_2 {
         this.fgroup = fgroup;
         this.pgroup = pgroup;
         this.doc = ((): Promise<PDFDocument> => {
-        return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages);
+        return PDFUtil.pickPagesCollapse(fgroup.docs, pgroup.pages, pgroup.reverse);
         })();
     }
 }
@@ -159,14 +167,34 @@ export class expression_4 {
         })();
     }
 }
-export class pageGroup {
-    public kind: ASTKinds.pageGroup = ASTKinds.pageGroup;
+export type pageGroup = pageGroup_1 | pageGroup_2;
+export class pageGroup_1 {
+    public kind: ASTKinds.pageGroup_1 = ASTKinds.pageGroup_1;
     public list: pageList;
     public pages: number[];
+    public reverse: boolean;
     constructor(list: pageList){
         this.list = list;
         this.pages = ((): number[] => {
         return list.pages;
+        })();
+        this.reverse = ((): boolean => {
+        return false;
+        })();
+    }
+}
+export class pageGroup_2 {
+    public kind: ASTKinds.pageGroup_2 = ASTKinds.pageGroup_2;
+    public list: pageList;
+    public pages: number[];
+    public reverse: boolean;
+    constructor(list: pageList){
+        this.list = list;
+        this.pages = ((): number[] => {
+        return list.pages;
+        })();
+        this.reverse = ((): boolean => {
+        return true;
         })();
     }
 }
@@ -186,14 +214,14 @@ export class pageList_1 {
 }
 export class pageList_2 {
     public kind: ASTKinds.pageList_2 = ASTKinds.pageList_2;
-    public left: page;
-    public right: page;
+    public from: page;
+    public to: page;
     public pages: number[];
-    constructor(left: page, right: page){
-        this.left = left;
-        this.right = right;
+    constructor(from: page, to: page){
+        this.from = from;
+        this.to = to;
         this.pages = ((): number[] => {
-        return PDFUtil.range(left.page, right.page);
+        return PDFUtil.range(from.page, to.page);
         })();
     }
 }
@@ -230,7 +258,7 @@ export class fileGroup {
         })();
     }
 }
-export type fileList = fileList_1 | fileList_2;
+export type fileList = fileList_1 | fileList_2 | fileList_3;
 export class fileList_1 {
     public kind: ASTKinds.fileList_1 = ASTKinds.fileList_1;
     public left: file;
@@ -246,6 +274,19 @@ export class fileList_1 {
 }
 export class fileList_2 {
     public kind: ASTKinds.fileList_2 = ASTKinds.fileList_2;
+    public from: num;
+    public to: num;
+    public docs: Promise<PDFDocument>[];
+    constructor(from: num, to: num){
+        this.from = from;
+        this.to = to;
+        this.docs = ((): Promise<PDFDocument>[] => {
+        return PDFUtil.range(from.value, to.value).map(i => PDFUtil.identity(i));
+        })();
+    }
+}
+export class fileList_3 {
+    public kind: ASTKinds.fileList_3 = ASTKinds.fileList_3;
     public f: file;
     public docs: Promise<PDFDocument>[];
     constructor(f: file){
@@ -382,16 +423,37 @@ export class Parser {
             });
     }
     public matchpageGroup($$dpth: number, $$cr?: ErrorTracker): Nullable<pageGroup> {
-        return this.run<pageGroup>($$dpth,
+        return this.choice<pageGroup>([
+            () => this.matchpageGroup_1($$dpth + 1, $$cr),
+            () => this.matchpageGroup_2($$dpth + 1, $$cr),
+        ]);
+    }
+    public matchpageGroup_1($$dpth: number, $$cr?: ErrorTracker): Nullable<pageGroup_1> {
+        return this.run<pageGroup_1>($$dpth,
             () => {
                 let $scope$list: Nullable<pageList>;
-                let $$res: Nullable<pageGroup> = null;
+                let $$res: Nullable<pageGroup_1> = null;
                 if (true
                     && this.regexAccept(String.raw`(?:\()`, "", $$dpth + 1, $$cr) !== null
                     && ($scope$list = this.matchpageList($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:\))`, "", $$dpth + 1, $$cr) !== null
                 ) {
-                    $$res = new pageGroup($scope$list);
+                    $$res = new pageGroup_1($scope$list);
+                }
+                return $$res;
+            });
+    }
+    public matchpageGroup_2($$dpth: number, $$cr?: ErrorTracker): Nullable<pageGroup_2> {
+        return this.run<pageGroup_2>($$dpth,
+            () => {
+                let $scope$list: Nullable<pageList>;
+                let $$res: Nullable<pageGroup_2> = null;
+                if (true
+                    && this.regexAccept(String.raw`(?:-\()`, "", $$dpth + 1, $$cr) !== null
+                    && ($scope$list = this.matchpageList($$dpth + 1, $$cr)) !== null
+                    && this.regexAccept(String.raw`(?:\))`, "", $$dpth + 1, $$cr) !== null
+                ) {
+                    $$res = new pageGroup_2($scope$list);
                 }
                 return $$res;
             });
@@ -422,15 +484,15 @@ export class Parser {
     public matchpageList_2($$dpth: number, $$cr?: ErrorTracker): Nullable<pageList_2> {
         return this.run<pageList_2>($$dpth,
             () => {
-                let $scope$left: Nullable<page>;
-                let $scope$right: Nullable<page>;
+                let $scope$from: Nullable<page>;
+                let $scope$to: Nullable<page>;
                 let $$res: Nullable<pageList_2> = null;
                 if (true
-                    && ($scope$left = this.matchpage($$dpth + 1, $$cr)) !== null
+                    && ($scope$from = this.matchpage($$dpth + 1, $$cr)) !== null
                     && this.regexAccept(String.raw`(?:~)`, "", $$dpth + 1, $$cr) !== null
-                    && ($scope$right = this.matchpage($$dpth + 1, $$cr)) !== null
+                    && ($scope$to = this.matchpage($$dpth + 1, $$cr)) !== null
                 ) {
-                    $$res = new pageList_2($scope$left, $scope$right);
+                    $$res = new pageList_2($scope$from, $scope$to);
                 }
                 return $$res;
             });
@@ -480,6 +542,7 @@ export class Parser {
         return this.choice<fileList>([
             () => this.matchfileList_1($$dpth + 1, $$cr),
             () => this.matchfileList_2($$dpth + 1, $$cr),
+            () => this.matchfileList_3($$dpth + 1, $$cr),
         ]);
     }
     public matchfileList_1($$dpth: number, $$cr?: ErrorTracker): Nullable<fileList_1> {
@@ -501,12 +564,28 @@ export class Parser {
     public matchfileList_2($$dpth: number, $$cr?: ErrorTracker): Nullable<fileList_2> {
         return this.run<fileList_2>($$dpth,
             () => {
-                let $scope$f: Nullable<file>;
+                let $scope$from: Nullable<num>;
+                let $scope$to: Nullable<num>;
                 let $$res: Nullable<fileList_2> = null;
+                if (true
+                    && ($scope$from = this.matchnum($$dpth + 1, $$cr)) !== null
+                    && this.regexAccept(String.raw`(?:~)`, "", $$dpth + 1, $$cr) !== null
+                    && ($scope$to = this.matchnum($$dpth + 1, $$cr)) !== null
+                ) {
+                    $$res = new fileList_2($scope$from, $scope$to);
+                }
+                return $$res;
+            });
+    }
+    public matchfileList_3($$dpth: number, $$cr?: ErrorTracker): Nullable<fileList_3> {
+        return this.run<fileList_3>($$dpth,
+            () => {
+                let $scope$f: Nullable<file>;
+                let $$res: Nullable<fileList_3> = null;
                 if (true
                     && ($scope$f = this.matchfile($$dpth + 1, $$cr)) !== null
                 ) {
-                    $$res = new fileList_2($scope$f);
+                    $$res = new fileList_3($scope$f);
                 }
                 return $$res;
             });
