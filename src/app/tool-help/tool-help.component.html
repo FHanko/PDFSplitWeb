@@ -1,1 +1,35 @@
-<p>tool-help works!</p>
+<div class="container-lg">
+<p>
+    To use PDFSplit first select the pdf files you want to work with in the file selector by clicking on the <strong>'Browse...'</strong> button.
+    Every selected pdf will be associated with a number visible above the file selector, this number will be referred to as <strong>pdf id</strong>.
+    For the sake of the examples on this page imagine the following pdfs are selected:<br>
+    @for (pdf of this.pdfs; track $index) {
+        <span class="mt-1"><strong>{{$index+1}}: </strong><i>{{pdf.title}} ({{pdf.pages}} pages)</i><br></span>
+    }
+</p>
+<p>Below are some examples on how an expression can be used to work with selected pdfs:</p>
+
+<h4>Selecting pages from a pdf</h4>
+<p>To select pages from a pdf file put the <strong>pdf id</strong> you want to select from in brackets followed by a ':' and the pages you wish to select.</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(1):(1, 2, 3)</textarea>
+<p>Selects pages 1,2 and 3 from <i>Tutorial.pdf</i>.</p>
+<p>Ranges of pages can be specified by giving a start and end pages connected with '~':</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(1):(1~3, 6~7)</textarea>
+<p>Selects pages 1,2,3 and 6,7 from <i>Tutorial.pdf</i>. Note that ranges are inclusive and that pdfs start from page 1 (and not 0) to be consistent with natural page numbering.</p>
+<p>To exlude only certain pages from a pdf a '-' can be added in front of a page block:</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(1):-(1~3)</textarea>
+<p>Selects all pages except 1,2 and 3 from <i>Tutorial.pdf</i>.</p>
+
+<h4>Combining pdfs</h4>
+
+<p>To combine pdfs you can write their ids one after another:</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(2) (3)</textarea>
+<p>Combines the two pdfs <i>Taxes1.pdf</i> and <i>Taxes2.pdf</i> in the order their <strong>pdf id</strong> is given.</p>
+<p>Of course you can also select pages while doing so:</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(2):(1~9) (3):(1~9)</textarea>
+<p>Combines <i>Taxes1.pdf</i> and the first 9 pages of <i>Taxes2.pdf</i>.</p>
+<p>When selecting the same pages from multiple pdfs this can be shortened to:</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(2, 3):(1~9)</textarea>
+<p>Or</p>
+<textarea class="form-control mb-2" style="height: 32px;" readonly>(2~3):(1~9)</textarea>
+</div>

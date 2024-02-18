@@ -1,3 +1,6 @@
+<div class="container-lg">
+<p>PDFSplit is a tool to combine, split and slice multiple pdfs by a given expression. The Help page gives information about how expressions can be formed.</p>
+
 @for (pdf of getPDFs(); track $index) {
     <p>
         <strong>{{$index+1}}: </strong><i>{{pdf.getTitle()}} ({{pdf.getPageCount()}} pages)</i>
@@ -13,4 +16,5 @@
     <p>{{err.toString()}}</p>
 }
 <p>{{getError()}}</p>
+</div>
 </div>
