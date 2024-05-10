@@ -14,7 +14,11 @@ export class PDFUtil {
 
   static async pickPages(doc: Promise<PDFDocument>, indices: number[], reverseIndiced: boolean = false): Promise<PDFDocument> {
     let pdf = await doc
-    if (reverseIndiced) indices = pdf.getPageIndices().map(i => i + 1).filter(i => !indices.includes(i))
+    if (reverseIndiced) { 
+      indices = pdf.getPageIndices().map(i => i + 1).filter(i => !indices.includes(i)) 
+    } else {
+      indices = indices.filter(i => pdf.getPageIndices().map(i => i + 1).includes(i))
+    }
 
     let pages = await pdf.copyPages(pdf, indices.map(i => i - 1))
     let count = pdf.getPageCount();

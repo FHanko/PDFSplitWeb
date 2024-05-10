@@ -7,7 +7,3 @@
 .dark-header a {
     @extend .text-light;
 }
-
-.dark-header a:focus  {
-    @extend .text-primary;
-}

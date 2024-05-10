@@ -35,6 +35,7 @@ export class PdfToolComponent {
       if (file == null) continue;
       let buffer = await file.arrayBuffer()
       let doc = await PDFDocument.load(buffer)
+      doc.setCreationDate(new Date(Date.now()))
       doc.setTitle(file.name)
       PDFUtil.docs.push(doc)
     }
